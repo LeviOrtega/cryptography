@@ -20,13 +20,28 @@
 
   --letter-transform-x: 200px;
 
-  --num-rings: 12;
   --ring-spacing: 30px;
-  --letter-size: 20px;
+  --letter-size: 22px;
   --letter-font-size: 12px;
-  --letter-transform-x: 115px;
+  --letter-transform-x: 120px;
   --letter-size-lrg: 36px;
-  --letter-font-size-lrg: 16px;
+  --letter-font-size-lrg: 20px;
+
+  --stone-base: #3d352a; /* Darker sandstone */
+  --stone-highlight: #4a4235;
+  --moss: rgba(45, 61, 38, 0.4);
+  --torch-glow: radial-gradient(
+    circle at center,
+    rgba(255, 140, 0, 0.15) 0%,
+    transparent 70%
+  );
+
+  background: 
+    /* Moss patches in the corners */
+    radial-gradient(circle at 10% 10%, var(--moss), transparent 40%),
+    radial-gradient(circle at 90% 85%, var(--moss), transparent 40%),
+    /* Heavy vignette for "Temple Raid" mood */
+    radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 0.8) 100%);
 
   @media (max-width: 1024px) {
     font-size: 13px;
@@ -68,12 +83,41 @@
   box-sizing: border-box;
 }
 
+body {
+  background-color: var(--stone-base);
+  background-image:
+    var(--torch-glow),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2) 2px, transparent 2px);
+  background-size:
+    100% 100%,
+    150px 100px,
+    150px 100px,
+    auto;
+  background-attachment: fixed;
+}
+
+#root::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
 .ring-group {
   width: 100%;
   justify-content: center;
   display: flex;
   grid-template-columns: repeat(6, 1fr);
-  column-gap: 15px;
+  column-gap: 10px;
   padding-inline-start: 0px;
 }
 
@@ -83,11 +127,23 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 300px;
+  border-radius: 10px;
+  padding-left: 5px;
+  padding-right: 5px;
+  height: 250px;
+
+  box-shadow:
+    0 0 30px rgba(0, 0, 0, 0.9),
+    0 0 60px rgba(255, 140, 0, 0.05); /* Orange torch tint */
+  border: 4px solid #5c4033; /* Dark "weathered wood" border */
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .ring {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: var(--letter-size);
   width: var(--letter-size);
   transform-style: preserve-3d;
@@ -101,20 +157,47 @@
 }
 
 .submit {
-  height: 30px;
-  width: 30px;
+  height: 50px;
+  width: 50px;
   color: rgba(255, 255, 255, 0.528);
-  border-color: rgba(255, 255, 255, 0.636);
-  border: 1px solid;
+  box-shadow:
+    0 0 30px rgba(0, 0, 0, 0.9),
+    0 0 60px rgba(255, 140, 0, 0.05); /* Orange torch tint */
+  border: 4px solid #5c4033; /* Dark "weathered wood" border */
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
   padding: 5px;
+  margin: 5px;
+}
+
+.glyph {
+  color: rgba(255, 255, 255, 0);
 }
 
 .submit:hover {
-  transform: translateY(-2px);
+  transform: scale(1.05);
   cursor: pointer;
-  color: rgb(255, 255, 255);
-  border-color: rgb(255, 255, 255);
-  transition: ease-in 0.2;
+  color: black;
+  transition: all 0.3s steps(3);
+
+  background: #af7357;
+}
+
+.submit:hover .glyph {
+  color: rgba(255, 255, 255, 0.854);
+  transition: color 0.3s steps(4) 0.3s;
+  animation: float var(--time) steps(4) infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  50% {
+    transform: var(--t);
+  }
+  /* Color removed from here */
 }
 
 .submit.victory {
@@ -122,7 +205,7 @@
   background-color: #b8860b; /* Deep Gold */
 }
 
-.submit.victory:hover  {
+.submit.victory:hover {
   color: black;
   border-color: black;
   cursor: pointer;
@@ -171,11 +254,12 @@
   height: var(--letter-size);
   width: var(--letter-size);
   font-size: var(--letter-font-size);
-  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   color: rgba(255, 255, 255, 0.528);
-  border-color: rgba(255, 255, 255, 0.636);
-  border: 1px solid;
+  border: 1px solid rgba(255, 255, 255, 0.636);
   background-color: rgba(34, 34, 34, 0.8);
   backface-visibility: hidden;
   -moz-user-select: -moz-none;
@@ -189,7 +273,8 @@
 }
 
 .letter:hover:not(.selected):not(.victory) {
-  color: rgba(255, 255, 255, 0.802);
+  border: 1px solid rgba(255, 255, 255, 0.636);
+  color: rgb(255, 255, 255);
 }
 
 .letter.victory {
@@ -201,9 +286,15 @@
   font-size: var(--letter-font-size-lrg);
 }
 
-.selected {
-  color: rgb(255, 255, 255);
+.letter.selected {
+  height: 25px;
+  width: 25px;
   font-size: var(--letter-font-size-lrg);
+  border: 2px solid #5c4033;
+
+  background: #af7357;
+  color: rgb(255, 255, 255);
+  transition: all 0.2s steps(2) var(--s);
 }
 
 .answer {

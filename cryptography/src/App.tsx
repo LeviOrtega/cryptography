@@ -87,8 +87,8 @@ function App() {
               className="ring"
               style={
                 {
-                  "--d":  Math.floor(((1 + Math.abs(diff)) / 2)) * 3 ,
-                  "--s": `${0.2 * Math.abs(diff)}s`,
+                  "--d": Math.abs(diff) * 4,
+                  "--s": `${1 / Math.abs(diff)}s`,
                   transform: getTransform(ringIndex),
                 } as React.CSSProperties
               }
@@ -127,8 +127,8 @@ function App() {
               className="ring"
               style={
                 {
-                  "--d":  Math.floor(((1 + Math.abs(diff)) / 2)) * 3 ,
-                  "--s": `${0.2 * Math.abs(diff)}s`,
+                  "--d": Math.abs(diff) * 4,
+                  "--s": `${1 / Math.abs(diff)}s`,
                   transform: getTransform(ringIndex + mid),
                 } as React.CSSProperties
               }
