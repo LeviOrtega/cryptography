@@ -1,0 +1,299 @@
+:root {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px,
+    rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: system-ui, "Protobesh", sans-serif;
+  --heading: system-ui, "Protobesh", sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+
+  --shift-timing: 0.5s;
+
+  --letter-transform-x: 120px;
+  --ring-spacing: 30px;
+
+  --letter-size: 22px;
+  --letter-font-size: 12px;
+
+  --letter-size-lrg: 36px;
+  --letter-font-size-lrg: 16px;
+
+  --stone-base: #3d352a;
+  --stone-highlight: #4a4235;
+
+  --moss: rgba(45, 61, 38, 0.4);
+
+  --torch-glow: radial-gradient(
+    circle at center,
+    rgba(255, 140, 0, 0.15) 0%,
+    transparent 70%
+  );
+
+  background:
+    radial-gradient(circle at 10% 10%, var(--moss), transparent 40%),
+    radial-gradient(circle at 90% 85%, var(--moss), transparent 40%),
+    radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 0.8) 100%);
+}
+
+/* ---------------- FONT ---------------- */
+
+@font-face {
+  font-family: "Protobesh";
+  src: url("./assets/ProtobeshAF.otf") format("opentype");
+}
+
+
+#root {
+  width: 1126px;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  background-color: var(--stone-base);
+  background-image:
+    var(--torch-glow),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2) 2px, transparent 2px);
+  background-attachment: fixed;
+}
+
+/* ---------------- CRYPTEX LAYOUT ---------------- */
+
+.ring-group {
+  display: flex;
+  justify-content: center;
+  column-gap: 10px;
+  padding: 0;
+  width: 100%;
+}
+
+.cryptex-container {
+  perspective: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 250px;
+
+  border-radius: 10px;
+  padding: 5px;
+
+  box-shadow:
+    0 0 30px rgba(0, 0, 0, 0.9),
+    0 0 60px rgba(255, 140, 0, 0.05);
+
+  border: 4px solid #5c4033;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* ---------------- RING ---------------- */
+
+.ring {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  height: var(--letter-size);
+  width: var(--letter-size);
+
+  transform-style: preserve-3d;
+
+  transition: transform 0.25s steps(4) 0.6s;
+}
+
+/* ---------------- LETTER CORE ---------------- */
+
+.letter {
+  position: absolute;
+
+  font-family: "Protobesh", sans-serif;
+
+  height: var(--letter-size);
+  width: var(--letter-size);
+  font-size: var(--letter-font-size);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  user-select: none;
+  cursor: pointer;
+
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(34, 34, 34, 0.7);
+
+  backface-visibility: hidden;
+
+  transform:
+    rotateX(calc(var(--i) * 13.84deg))
+    translateZ(var(--letter-transform-x));
+
+  opacity: 0.08;
+  filter: blur(1px);
+  transition:
+    opacity 0.25s ease,
+    transform var(--shift-timing) steps(3),
+    font-size var(--shift-timing) steps(3),
+    filter 0.25s ease,
+    background 0.25s ease var(--shift-timing),
+    border 0.0s steps(1) var(--shift-timing);
+}
+
+/* ---------------- VIEWPORT STATES ---------------- */
+
+.letter.selected {
+  opacity: 1;
+  filter: blur(0px);
+
+  color: white;
+  background: #af7357;
+  border-top: 2px solid #5c4033;
+    border-bottom: 2px solid #5c4033;
+
+    border-right: 4px solid #5c4033;
+        border-left: 4px solid #5c4033;
+
+        font-size: var(--letter-font-size-lrg);
+
+
+  transform:
+    rotateX(calc(var(--i) * 13.84deg))
+    translateZ(calc(var(--letter-transform-x) + 10px));
+}
+
+/* adjacent letters */
+.letter.near {
+  opacity: 0.5;
+  filter: blur(0.2px);
+}
+
+/* transition zone */
+.letter.far {
+  opacity: 0.22;
+  filter: blur(0.6px);
+}
+
+
+/* ---------------- HOVER ---------------- */
+
+.letter:hover:not(.selected):not(.victory) {
+  opacity: 0.9;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* ---------------- LOCKED STATE ---------------- */
+
+.letter.victory {
+  opacity: 1;
+  color: black;
+
+  background: gold;
+  font-size: var(--letter-font-size-lrg);
+
+  animation: glow 0.5s ease forwards;
+}
+
+/* ---------------- BUTTON ---------------- */
+
+.split {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.submit {
+  height: 50px;
+  width: 50px;
+
+  color: rgba(255, 255, 255, 0.5);
+
+  border: 4px solid #5c4033;
+  background: rgba(0, 0, 0, 0.4);
+
+  border-radius: 10px;
+  padding: 5px;
+  margin: 5px;
+
+  box-shadow:
+    0 0 30px rgba(0, 0, 0, 0.9),
+    0 0 60px rgba(255, 140, 0, 0.05);
+
+  transition: transform 0.25s steps(2);
+}
+
+.submit:hover {
+  transform: scale(1.05);
+  cursor: pointer;
+  background: #af7357;
+  color: black;
+}
+
+.glyph {
+  color: rgba(255, 255, 255, 0);
+  transition: color 0.2s ease;
+}
+
+/* reveal on hover (your original behavior preserved) */
+.submit:hover .glyph {
+  color: rgba(255, 255, 255, 0.854);
+  animation: float var(--time) steps(4) infinite;
+  transition: color 0.3s steps(4) 0.2s;
+}
+
+.submit:hover {
+  cursor: pointer;
+}
+
+/* ---------------- ANIMATIONS ---------------- */
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  50% {
+    transform: var(--t);
+  }
+}
+
+@keyframes glow {
+  0% {
+    background-color: #b8860b;
+    box-shadow:
+      0 0 5px #ffd700,
+      0 0 10px #b8860b;
+  }
+
+  100% {
+    background-color: #ffd700;
+    box-shadow:
+      0 0 10px #fffacd,
+      0 0 20px #ffd700,
+      0 0 40px #8b4513;
+  }
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-1px) rotate(-2deg); }
+  75% { transform: translateX(1px) rotate(2deg); }
+  100% { transform: translateX(0); }
+}
+
+.answer {
+  font-family: "Protobesh", sans-serif;
+}
