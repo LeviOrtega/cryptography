@@ -1,62 +1,53 @@
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Glyph } from "./assets/icons";
 
-function App() {
-  const groupSize = 8;
-  const mid = groupSize / 2;
-  const step = 360 / 26;
+const GROUP_SIZE = 8;
+const MID = GROUP_SIZE / 2;
+const STEP = 360 / 26;
+const WS_URL = "ws://127.0.0.1:8080";
 
+const ALPHA_NUMERIC = Array.from({ length: 26 }, (_, i) =>
+  String.fromCharCode(65 + i),
+);
+
+interface AttemptPayload {
+  attempt: number[];
+}
+
+function App() {
   const [codedMessage, setCodedMessage] = useState("");
-  const [input, setInput] = useState("");
-  const [correct, setCorrect] = useState(false);
-  const [locked, setLocked] = useState(false);
 
   const [rotationGroup, setRotationGroup] = useState<number[]>(
-    new Array(groupSize).fill(0),
+    new Array(GROUP_SIZE).fill(0),
   );
 
   const [indexGroup, setIndexGroup] = useState<number[]>(
-    new Array(groupSize).fill(0),
+    new Array(GROUP_SIZE).fill(0),
   );
 
-  const alphaNumeric = Array.from({ length: 26 }, (_, i) =>
-    String.fromCharCode(65 + i),
-  );
-
-  const currentValues = useMemo(() => {
-    const newGroup = indexGroup.map((i) => alphaNumeric[i]);
-    const concat = newGroup.join("");
-
-    setCorrect(
-      concat.toLowerCase() === input.toLowerCase() &&
-        input.length === groupSize,
-    );
-
-    return newGroup;
-  }, [indexGroup, input]);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8080");
-    ws.onopen = () => console.log("connected!");
-    ws.onmessage = (event) => setCodedMessage(event.data);
-    ws.onerror = (err) => console.error("error:", err);
+    const socket = new WebSocket(WS_URL);
+    wsRef.current = socket;
 
+    socket.onopen = () => console.log("connected!");
+    socket.onmessage = (event) => setCodedMessage(event.data);
+    socket.onerror = (err) => console.error("error:", err);
+
+    return () => socket.close();
   }, []);
 
-
-
   const handleClick = (ringIndex: number, charIndex: number) => {
-    setLocked(false);
-
     const currentIndex = indexGroup[ringIndex];
     let diff = charIndex - currentIndex;
 
-    if (diff > alphaNumeric.length / 2) diff -= alphaNumeric.length;
-    if (diff < -alphaNumeric.length / 2) diff += alphaNumeric.length;
+    if (diff > ALPHA_NUMERIC.length / 2) diff -= ALPHA_NUMERIC.length;
+    if (diff < -ALPHA_NUMERIC.length / 2) diff += ALPHA_NUMERIC.length;
 
     setRotationGroup((prev) => {
       const next = [...prev];
-      next[ringIndex] += step * diff;
+      next[ringIndex] += STEP * diff;
       return next;
     });
 
@@ -73,16 +64,14 @@ function App() {
     const rotation = rotationGroup[ringIndex];
 
     const visibleIndex =
-      ((Math.round(rotation / step) % alphaNumeric.length) +
-        alphaNumeric.length) %
-      alphaNumeric.length;
+      ((Math.round(rotation / STEP) % ALPHA_NUMERIC.length) +
+        ALPHA_NUMERIC.length) %
+      ALPHA_NUMERIC.length;
 
     const distance = Math.min(
       Math.abs(charIndex - visibleIndex),
-      alphaNumeric.length - Math.abs(charIndex - visibleIndex),
+      ALPHA_NUMERIC.length - Math.abs(charIndex - visibleIndex),
     );
-
-    if (locked && visibleIndex === charIndex) return "victory";
 
     if (distance === 0) return "selected";
     if (distance <= 4) return "near";
@@ -92,10 +81,8 @@ function App() {
   };
 
   const submit = () => {
-    const concat = currentValues.join("");
-    if (concat.toLowerCase() === input.toLowerCase()) {
-      setLocked(true);
-    }
+    const payload: AttemptPayload = { attempt: indexGroup };
+    wsRef.current?.send(JSON.stringify(payload));
   };
 
   const ringGroup = (start: number, end?: number) => {
@@ -113,7 +100,7 @@ function App() {
                 } as React.CSSProperties
               }
             >
-              {alphaNumeric.map((char, charIndex) => (
+              {ALPHA_NUMERIC.map((char, charIndex) => (
                 <div
                   key={char + charIndex}
                   className={`letter ${getLetterState(ringIndex + start, charIndex)}`}
@@ -131,27 +118,17 @@ function App() {
   };
 
   return (
-    <><div className="coded-message">{codedMessage}</div>
+    <>
+      <div className="coded-message">{codedMessage}</div>
       <ul className="ring-group">
-        {ringGroup(0, mid)}
+        {ringGroup(0, MID)}
         <div className="split">
-          <div
-            className={correct ? "submit victory" : "submit"}
-            onClick={submit}
-          >
+          <div className="submit" onClick={submit}>
             <Glyph />
           </div>
         </div>
-        {ringGroup(mid)}
+        {ringGroup(MID)}
       </ul>
-
-      <div className="answer">{input}</div>
-
-      <input
-        type="text"
-        maxLength={groupSize}
-        onChange={(e) => setInput(e.currentTarget.value)}
-      />
     </>
   );
 }

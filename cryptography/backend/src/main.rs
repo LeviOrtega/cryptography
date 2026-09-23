@@ -9,12 +9,11 @@ use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
  * 
  */
 
+const KEY: [i32; 8] = [0; 8];
+
 #[derive(serde::Deserialize)]
 struct Payload {
-    plaintext: i32,
-    key: i32,
-    cipher: i32,
-
+    attempt: [i32; 8]
 }
 
 async fn handle_connection(raw_stream: TcpStream, socet_addr: SocketAddr) {
@@ -28,14 +27,22 @@ async fn handle_connection(raw_stream: TcpStream, socet_addr: SocketAddr) {
         }
     };
 
+    let mut password: [i32; 8] = [0; 8];
+    let mut coded: [i32; 8] = derive_coded(password);
+
     println!("WebSocket connection established with: {}", socet_addr);
     let (mut write, mut read) = ws_stream.split();
+
+    let setup_msg = Message::text(build_coded_string(coded));
+
+    if let Err(e) = write.send(setup_msg).await {
+        eprintln!("Error sending message to {}: {}", socet_addr, e);
+    }
 
     while let Some(msg_result) = read.next().await {
         match msg_result {
             Ok(msg) => {
-                // If it's text or binary, echo it right back
-                if msg.is_text() || msg.is_binary(){
+                if msg.is_text(){
                     println!("Received from {}: {}", socet_addr, msg);
 
                         let text = msg.to_text().unwrap_or("");
@@ -47,8 +54,17 @@ async fn handle_connection(raw_stream: TcpStream, socet_addr: SocketAddr) {
                             }
                         };
 
-                        let result = calculation(payload.plaintext, payload.key, payload.cipher).to_string();
-                        let new_msg = Message::text(result);
+                    let result = if password == payload.attempt {
+                    String::from("success")
+                    } else {
+                    password = generate_password();                    
+                    coded = derive_coded(password);
+
+                    println!("Password {} Code {}", format!("{:?}", password), format!("{:?}", coded));
+
+                    build_coded_string(coded)
+                    };                        
+                    let new_msg = Message::text(result);
 
                     if let Err(e) = write.send(new_msg).await {
                         eprintln!("Error sending message to {}: {}", socet_addr, e);
@@ -72,12 +88,26 @@ const ALPHABET: [char; 26] = [
     'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-fn calculation(plain: i32, key: i32, cipher: i32) -> char {
-    let result: i32 = (25 - (cipher + key)) % 26;
-
-    ALPHABET[result as usize]
+fn build_coded_string(coded: [i32; 8]) -> String {
+    let string_result: String = coded.iter().map(|&num| ALPHABET[num as usize]).collect();
+    string_result
 }
 
+fn derive_coded(password: [i32;8]) -> [i32; 8] {
+    let mut coded: [i32; 8] = [0; 8];
+    for (index, value) in coded.iter_mut().enumerate() {
+        *value = (25 - (password[index] + KEY[index])) % 26;
+    }
+    coded
+}
+
+fn generate_password() -> [i32; 8] {
+    let mut password: [i32; 8] = [0; 8];
+    for value in &mut password {
+        *value = rand::random_range(0..26);
+    }
+    password
+}
 
 #[tokio::main]
 async fn main() {
@@ -86,7 +116,6 @@ async fn main() {
     println!("WebSocket server listening on: {}", addr);
 
 
-    // Accept incoming TCP streams in a loop
     while let Ok((stream, socket_addr)) = listener.accept().await {
         tokio::spawn(handle_connection(stream, socket_addr));
     }
