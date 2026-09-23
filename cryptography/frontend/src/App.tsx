@@ -6,6 +6,7 @@ function App() {
   const mid = groupSize / 2;
   const step = 360 / 26;
 
+  const [codedMessage, setCodedMessage] = useState("");
   const [input, setInput] = useState("");
   const [correct, setCorrect] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -35,18 +36,14 @@ function App() {
   }, [indexGroup, input]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch("http://127.0.0.1:3000");
-        const result = await response.json();
+    const ws = new WebSocket("ws://127.0.0.1:8080");
+    ws.onopen = () => console.log("connected!");
+    ws.onmessage = (event) => setCodedMessage(event.data);
+    ws.onerror = (err) => console.error("error:", err);
 
-        setInput(result.input ? result.input : "");
-      } catch (error) {
-        console.log(error);
-      }
-    };
-    fetchData();
-  }, [setInput]);
+  }, []);
+
+
 
   const handleClick = (ringIndex: number, charIndex: number) => {
     setLocked(false);
@@ -134,7 +131,7 @@ function App() {
   };
 
   return (
-    <>
+    <><div className="coded-message">{codedMessage}</div>
       <ul className="ring-group">
         {ringGroup(0, mid)}
         <div className="split">
