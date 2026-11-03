@@ -1,122 +1,83 @@
-use futures_util::{SinkExt, StreamExt};
+mod cipher;
+mod protocol;
+mod state;
+mod ws;
+
 use std::net::SocketAddr;
-use tokio::net::{TcpListener, TcpStream};
-use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
+use std::path::PathBuf;
 
-/** TODO
- * Setup with DB 
- * 
- * 
- */
-
-const KEY: [i32; 8] = [0; 8];
-
-#[derive(serde::Deserialize)]
-struct Payload {
-    attempt: [i32; 8]
-}
-
-async fn handle_connection(raw_stream: TcpStream, socet_addr: SocketAddr) {
-    println!("Incoming TCP connection from: {}", socet_addr);
-
-    let ws_stream = match accept_async(raw_stream).await {
-        Ok(stream) => stream,
-        Err(e) => {
-            eprintln!("Error during WebSocket handshake: {}", e);
-            return;
-        }
-    };
-
-    let mut password: [i32; 8] = [0; 8];
-    let mut coded: [i32; 8] = derive_coded(password);
-
-    println!("WebSocket connection established with: {}", socet_addr);
-    let (mut write, mut read) = ws_stream.split();
-
-    let setup_msg = Message::text(build_coded_string(coded));
-
-    if let Err(e) = write.send(setup_msg).await {
-        eprintln!("Error sending message to {}: {}", socet_addr, e);
-    }
-
-    while let Some(msg_result) = read.next().await {
-        match msg_result {
-            Ok(msg) => {
-                if msg.is_text(){
-                    println!("Received from {}: {}", socet_addr, msg);
-
-                        let text = msg.to_text().unwrap_or("");
-                        let payload: Payload = match serde_json::from_str(text) {
-                            Ok(p) => p,
-                            Err(e) => {
-                                eprintln!("Failed to parse JSON: {}", e);
-                                continue; 
-                            }
-                        };
-
-                    let result = if password == payload.attempt {
-                    String::from("success")
-                    } else {
-                    password = generate_password();                    
-                    coded = derive_coded(password);
-
-                    println!("Password {} Code {}", format!("{:?}", password), format!("{:?}", coded));
-
-                    build_coded_string(coded)
-                    };                        
-                    let new_msg = Message::text(result);
-
-                    if let Err(e) = write.send(new_msg).await {
-                        eprintln!("Error sending message to {}: {}", socet_addr, e);
-                        break;
-                    }
-                } else if msg.is_close() {
-                    println!("Client {} disconnected.", socet_addr);
-                    break;
-                }
-            }
-            Err(e) => {
-                eprintln!("Error reading message from {}: {}", socet_addr, e);
-                break;
-            }
-        }
-    }
-}
-
-const ALPHABET: [char; 26] = [
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-];
-
-fn build_coded_string(coded: [i32; 8]) -> String {
-    let string_result: String = coded.iter().map(|&num| ALPHABET[num as usize]).collect();
-    string_result
-}
-
-fn derive_coded(password: [i32;8]) -> [i32; 8] {
-    let mut coded: [i32; 8] = [0; 8];
-    for (index, value) in coded.iter_mut().enumerate() {
-        *value = (25 - (password[index] + KEY[index])) % 26;
-    }
-    coded
-}
-
-fn generate_password() -> [i32; 8] {
-    let mut password: [i32; 8] = [0; 8];
-    for value in &mut password {
-        *value = rand::random_range(0..26);
-    }
-    password
-}
+use axum::{Router, routing::get};
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
-    let addr = "127.0.0.1:8080";
-    let listener = TcpListener::bind(&addr).await.expect("Failed to bind TCP listener");
-    println!("WebSocket server listening on: {}", addr);
+    dotenv::dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,tower_http=warn")),
+        )
+        .init();
 
+    // --- configuration -----------------------------------------------------
+    let key_raw = std::env::var("CRYPTEX_KEY")
+        .expect("CRYPTEX_KEY must be set (8 letters or 8 comma-separated ints 0..26)");
+    let key = match cipher::parse_key(&key_raw) {
+        Ok(k) => k,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    };
+    let admin_token = std::env::var("CRYPTEX_ADMIN_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty());
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8080);
+    let static_dir = PathBuf::from(
+        std::env::var("STATIC_DIR").unwrap_or_else(|_| "../frontend/dist".into()),
+    );
 
-    while let Ok((stream, socket_addr)) = listener.accept().await {
-        tokio::spawn(handle_connection(stream, socket_addr));
+    let state = state::AppState::new(key, admin_token);
+
+    // --- routes -------------------------------------------------------------
+    let mut app = Router::new()
+        .route("/ws", get(ws::ws_handler))
+        .route("/health", get(|| async { "ok" }));
+
+    if static_dir.join("index.html").is_file() {
+        tracing::info!(dir = %static_dir.display(), "serving frontend");
+        let index = static_dir.join("index.html");
+        app = app.fallback_service(ServeDir::new(&static_dir).fallback(ServeFile::new(index)));
+    } else {
+        tracing::warn!(
+            dir = %static_dir.display(),
+            "no built frontend found; only /ws and /health are served (run `npm run build` or set STATIC_DIR)"
+        );
     }
+
+    let app = app.layer(TraceLayer::new_for_http()).with_state(state);
+
+    // --- serve --------------------------------------------------------------
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("failed to bind listener");
+    tracing::info!(%addr, "cryptex server listening");
+
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        let _ = tokio::signal::ctrl_c().await;
+    })
+    .await
+    .expect("server error");
 }

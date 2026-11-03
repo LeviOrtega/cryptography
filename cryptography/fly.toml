@@ -1,0 +1,38 @@
+# fly.toml — single-machine deploy of the Rust server + built frontend.
+# Change `app` to whatever name `fly launch` gives you.
+app = "cryptex"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  STATIC_DIR = "/app/static"
+  RUST_LOG = "info,tower_http=warn"
+  # CRYPTEX_KEY and CRYPTEX_ADMIN_TOKEN are secrets:
+  #   fly secrets set CRYPTEX_KEY=HOLOGRAM CRYPTEX_ADMIN_TOKEN=...
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The puzzle state lives in memory, so keep exactly one machine awake.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 500
+    hard_limit = 1000
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
