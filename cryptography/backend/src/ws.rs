@@ -1,6 +1,3 @@
-//! One task per connected browser. Inbound frames mutate the shared game;
-//! every change is broadcast, and this task relays broadcasts back out.
-
 use axum::{
     extract::{
         ConnectInfo, State,
@@ -39,7 +36,6 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: SharedState) 
     let (mut sink, mut stream) = socket.split();
     let mut rx = state.tx.subscribe();
 
-    // Initial snapshot so the client renders the current rings + coded string.
     let snapshot = state.game.read().await.snapshot();
     if !send(&mut sink, &snapshot).await {
         return;
@@ -47,7 +43,6 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: SharedState) 
 
     loop {
         tokio::select! {
-            // Something changed (possibly caused by another client) -> relay it.
             broadcast = rx.recv() => {
                 match broadcast {
                     Ok(msg) => {
@@ -62,7 +57,6 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: SharedState) 
                 }
             }
 
-            // Frame from this client.
             inbound = stream.next() => {
                 let Some(Ok(msg)) = inbound else { break };
                 match msg {
@@ -72,18 +66,16 @@ async fn handle_socket(socket: WebSocket, addr: SocketAddr, state: SharedState) 
                         }
                     }
                     Message::Close(_) => break,
-                    // Pings/pongs/binary: axum answers pings automatically.
                     _ => {}
                 }
             }
         }
     }
 
+    let _ = sink.close().await;
     tracing::info!(%addr, "client disconnected");
 }
 
-/// Apply one client message. Broadcasts state changes to everyone; returns an
-/// `Error` reply addressed only to the sender when the message was rejected.
 async fn handle_client_msg(text: &str, state: &SharedState) -> Option<ServerMsg> {
     let msg: ClientMsg = match serde_json::from_str(text) {
         Ok(m) => m,

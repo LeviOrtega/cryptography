@@ -23,7 +23,6 @@ async fn main() {
         )
         .init();
 
-    // --- configuration -----------------------------------------------------
     let key_raw = std::env::var("CRYPTEX_KEY")
         .expect("CRYPTEX_KEY must be set (8 letters or 8 comma-separated ints 0..26)");
     let key = match cipher::parse_key(&key_raw) {
@@ -46,7 +45,6 @@ async fn main() {
 
     let state = state::AppState::new(key, admin_token);
 
-    // --- routes -------------------------------------------------------------
     let mut app = Router::new()
         .route("/ws", get(ws::ws_handler))
         .route("/health", get(|| async { "ok" }));
@@ -64,7 +62,6 @@ async fn main() {
 
     let app = app.layer(TraceLayer::new_for_http()).with_state(state);
 
-    // --- serve --------------------------------------------------------------
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await

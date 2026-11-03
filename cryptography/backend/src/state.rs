@@ -1,5 +1,3 @@
-//! The single shared puzzle every connected client is solving.
-
 use std::sync::Arc;
 
 use tokio::sync::{RwLock, broadcast};
@@ -17,11 +15,8 @@ pub struct Game {
 }
 
 pub enum AttemptOutcome {
-    /// Rings matched the password. Carries the values for the victory message.
     Solved(SolvedValues),
-    /// Wrong. The message has been shifted to a new password/coded pair.
     Shifted,
-    /// Puzzle was already open; nothing changed.
     AlreadySolved,
 }
 
@@ -54,7 +49,6 @@ impl Game {
         }
     }
 
-    /// Returns `true` if the ring actually moved.
     pub fn rotate(&mut self, ring: usize, index: u8) -> Result<bool, String> {
         if self.solved.is_some() {
             return Ok(false);
@@ -69,6 +63,7 @@ impl Game {
             return Ok(false);
         }
         self.rings[ring] = index;
+        tracing::debug!(ring, index, rings = ?self.rings, "rotate");
         Ok(true)
     }
 
@@ -90,7 +85,6 @@ impl Game {
             return AttemptOutcome::Solved(values);
         }
 
-        // Shift the message: new password, re-derived coded string, same key.
         self.password = cipher::random_password();
         self.coded = cipher::derive_coded(&self.password, &self.key);
         tracing::info!(
@@ -125,7 +119,6 @@ impl AppState {
         })
     }
 
-    /// Fan a message out to every connected client. Ignores "no receivers".
     pub fn broadcast(&self, msg: ServerMsg) {
         let _ = self.tx.send(msg);
     }
